@@ -1,33 +1,40 @@
+import io.github.dimyurich.wirelog.RequestLogger
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import ratpack.form.Form
-import ratpack.handling.RequestLogger
+import ratpack.handling.Context
 
 import static ratpack.groovy.Groovy.ratpack
 
 ratpack {
     bindings {
-        add LoggerFactory.getLogger('wirelog')
+        bindInstance(RequestLogger, new RequestLogger(LoggerFactory.getLogger('wirelog')))
     }
     handlers {
-        def nonFormHandler = RequestLogger.of({ outcome ->
-            registry.get(Logger).info("{} {}", outcome.request.method, outcome.request.uri)
-        })
-
-        def formHandler = { ctx -> ctx.parse(Form).then({ form ->
-            registry.get(Logger).info("{} {} {}", ctx.request.method, ctx.request.uri, form.entrySet())
-            ctx.next()
-        })}
-
         path(":path?") {
             byMethod() {
-                get nonFormHandler
-                post formHandler
-                put formHandler
+                get {Context ctx, RequestLogger rl ->
+                    rl.logGet(ctx, { Logger logger ->
+                        logger.info("{} {}", ctx.request.method, ctx.request.uri)
+                    }); response.send()
+                }
+                post {Context ctx, RequestLogger rl ->
+                    ctx.parse(Form).then({form ->
+                        rl.logPost(ctx, form, { Logger logger, Form innerForm ->
+                            logger.info("{} {} {}", ctx.request.method, ctx.request.uri, innerForm.entrySet())
+                        })
+                        response.send()
+                    })
+                }
+                put {Context ctx, RequestLogger rl ->
+                    ctx.parse(Form).then({form ->
+                        rl.logPut(ctx, form, { Logger logger, Form innerForm ->
+                            logger.info("{} {} {}", ctx.request.method, ctx.request.uri, innerForm.entrySet())
+                        })
+                        response.send()
+                    })
+                }
             }
-        }
-        all {
-            response.send()
         }
     }
 }

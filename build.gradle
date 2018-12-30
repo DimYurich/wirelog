@@ -25,7 +25,7 @@ dependencies {
     testCompile "org.spockframework:spock-core:0.7-groovy-2.0", {
         exclude module: "groovy-all"
     }
-    testCompile group: 'org.mockito', name: 'mockito-all', version: '1.10.19'
+    testCompile group: 'cglib', name: 'cglib-nodep', version: '2.2.2'
 }
 
 task buildDockerImage(type: com.bmuschko.gradle.docker.tasks.image.DockerBuildImage) {

@@ -1,6 +1,8 @@
-import org.slf4j.Logger
+import io.github.dimyurich.wirelog.RequestLogger
+import ratpack.form.Form
 import ratpack.groovy.test.GroovyRatpackMainApplicationUnderTest
 import ratpack.guice.Guice
+import ratpack.handling.Context
 import ratpack.impose.ImpositionsSpec
 import ratpack.impose.UserRegistryImposition
 import ratpack.test.http.TestHttpClient
@@ -8,21 +10,20 @@ import spock.lang.AutoCleanup
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static org.mockito.Mockito.mock
-import static org.mockito.Mockito.verify
 import static ratpack.http.HttpMethod.*
 import static ratpack.http.MediaType.*
+import static ratpack.http.internal.HttpHeaderConstants.CONTENT_TYPE
 
 class WireLogSpec extends Specification {
 
-    def logger = mock Logger
+    final RequestLogger logger = Mock(RequestLogger)
     @AutoCleanup
     GroovyRatpackMainApplicationUnderTest aut = new GroovyRatpackMainApplicationUnderTest() {
         @Override
         protected void addImpositions(ImpositionsSpec impositions) {
             impositions.add(
                     UserRegistryImposition.of(Guice.registry {
-                        it.add(logger)
+                        it.bindInstance(RequestLogger, logger)
                     }))
         }
     }
@@ -33,22 +34,34 @@ class WireLogSpec extends Specification {
     @Unroll
     def 'intercepts GETs'() {
         when: get a
-        then: verify(logger).info("{} {}", GET, a)
+        then:
+            1 * logger.logGet(*_) >> { arguments ->
+                final Context ctx = (Context) arguments[0]
+                assert ctx.request.method == GET
+                assert ctx.request.uri == a
+            }
         where:
-        a                       | _
-        "/"                     | _
-        "/resource?param=val"   | _
+            a                       | _
+            "/"                     | _
+            "/resource?param=val"   | _
     }
 
-    def 'intercepts POSTs'() {
-        def path = "/resource?param=val"
+    def 'intercepts POST'() {
+        def path = "/resource"
         when:
             requestSpec { requestSpec ->
-                requestSpec.body.type(APPLICATION_FORM)
-                requestSpec.body.text("aaa=bbb&ccc=ddd")
+                def body = "aaa=bbb&ccc=ddd&e=f&abc="
+                requestSpec.headers.add(CONTENT_TYPE, APPLICATION_FORM)
+                requestSpec.body.stream({ it << body })
             }
             post path
-        then: verify(logger).info("{} {} {}", POST, path, ["aaa": "bbb", "ccc": "ddd"].entrySet())
+        then:
+            1 * logger.logPost(*_) >> { arguments ->
+                final Context ctx = (Context) arguments[0]
+                assert ctx.request.method == POST
+                assert ctx.request.uri == path
+                final Form form = (Form) arguments[1]
+                assert form.entrySet() == ["aaa": "bbb", "ccc": "ddd", "e": "f", "abc": ""].entrySet()
+            }
     }
-
 }
