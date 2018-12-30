@@ -1,0 +1,35 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "io.ratpack:ratpack-gradle:1.6.0-rc-4"
+        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.3'
+    }
+}
+
+plugins {
+    id 'com.bmuschko.docker-remote-api' version '4.2.0'
+}
+
+apply plugin: "io.ratpack.ratpack-groovy"
+apply plugin: "idea"
+apply plugin: "com.github.johnrengelman.shadow"
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    runtime "org.slf4j:slf4j-simple:1.7.25"
+    testCompile "org.spockframework:spock-core:0.7-groovy-2.0", {
+        exclude module: "groovy-all"
+    }
+    testCompile group: 'org.mockito', name: 'mockito-all', version: '1.10.19'
+}
+
+task buildDockerImage(type: com.bmuschko.gradle.docker.tasks.image.DockerBuildImage) {
+    dependsOn shadowJar
+    inputDir = projectDir
+    tags.add('io.github.dimyurich/wirelog:latest')
+}
